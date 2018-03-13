@@ -4,7 +4,7 @@ import numpy as np
 
 
 @jit
-def pitches_from_audio(y, sr=22050, hop_length=512, fmin=None):
+def audio_to_pitches(y, sr=22050, hop_length=512, fmin=None):
     # Calculate pitches with 3 sub bands per semitone
     pitch = librosa.cqt(
         y, sr=sr,
@@ -41,4 +41,4 @@ def pitches_from_audio(y, sr=22050, hop_length=512, fmin=None):
         new_pitch[:, frame] = feature[b_index] - (0.25 * (feature[a_index] - feature[c_index]) * p)
         deviations.append(p)
 
-    return new_pitch, deviations
+    return new_pitch  # , deviations

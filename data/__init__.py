@@ -1,16 +1,7 @@
 import math
 import os
 
-import librosa.display
 import numpy as np
-from scipy.io import wavfile
-#from scipy.spatial.distance import cdist
-
-#from cemfi.database.musicnet import helper
-#from cemfi.alignment import dtw
-
-import src.features
-import src.util as util
 
 package_dir = os.path.dirname(os.path.abspath(__file__))
 dataset_path = os.path.join(package_dir, 'musicnet.npz')
@@ -44,23 +35,19 @@ dict_note_values = {
 def extract_ground_truth(rec_id, max_frame):
     audio, labels = dataset[rec_id]
 
-    # Get max values
     length = audio.shape[0]
     n_measures = 0
-    audio_onsets = []  # [0]
-    score_onsets = []  # [0]
+    audio_onsets = []
+    score_onsets = []
+
     for label in sorted(labels):
         (start, end, (instrument, note, measure, beat, note_value)) = label
         n_measures = max(n_measures, measure)
-    # n_measures += 1
 
     for label in sorted(labels):
         (start, end, (instrument, note, measure, beat, note_value)) = label
         audio_onsets.append(start / length * max_frame)
-        score_onsets.append(((measure) + float(f'{beat:.6f}')) / n_measures * max_frame)
-
-    # audio_onsets.append(max_frame - 1)
-    # score_onsets.append(max_frame - 1)
+        score_onsets.append((measure + float(f'{beat:.6f}')) / n_measures * max_frame)
 
     return audio_onsets, score_onsets
 
@@ -74,7 +61,6 @@ def extract_annotated_pitches(rec_id, sr=22050, hop_length=512):
         labels_in_frame = labels[frame * hop_length]
         for label in labels_in_frame:
             (start, end, (instrument, note, measure, beat, note_value)) = label
-            # print(note)
             pitches[frame, note] += 1
 
     pitches = np.log(pitches.T + 1)[24:24 + 12 * 8, :]
@@ -82,8 +68,9 @@ def extract_annotated_pitches(rec_id, sr=22050, hop_length=512):
     return pitches
 
 
-def extract_audio_pitches(rec_id, sr=22050, hop_length=512):
-    pass
+def extract_audio(rec_id):
+    audio, labels = dataset[rec_id]
+    return audio
 
 
 def extract_score_pitches(rec_id, frames):
@@ -118,72 +105,5 @@ def extract_score_pitches(rec_id, frames):
     return pitches
 
 
-# def get_alignment(audio_chroma, score_chroma, dist_metric='euclidean'):
-#     if dist_metric == 'euclidean':
-#         distances = cdist(
-#             score_chroma.T,
-#             audio_chroma.T
-#         )
-#     elif dist_metric == 'ta':
-#         score_chroma_circular = util.chroma_to_circular(score_chroma)
-#         distances = 1 - np.max(np.matmul(score_chroma_circular.T, audio_chroma), axis=1)
-#     else:
-#         raise ValueError("'{}' is not a valid distance metric!".format(dist_metric))
-#     d, wp = dtw.dtw(distances)
-#
-#     #path = (wp[:, 1], wp[:, 0])
-#
-#     return distances, wp
-
-
-def load_rec(rec_id, hop_length=2 ** 14):
-    if not os.path.exists(os.path.join(package_dir, 'cache', f'{rec_id}_{str(hop_length)}.npy')):
-        print('No cached values found. Building cache:')
-
-        print('Extracting audio...')
-        # Extract audio
-        audio, labels = dataset[rec_id]
-        audio = np.array(audio * 2 ** 15, dtype=np.int16)
-        wavfile.write(f'database/musicnet/original/{rec_id}.wav', 44100, audio)
-        normal_audio, sr = librosa.load(os.path.join(package_dir, 'original', f'{rec_id}.wav'))
-        pitched_audio, sr = librosa.load(os.path.join(package_dir, 'pitched', f'{rec_id}.wav'))
-        normal_audio_harm = librosa.effects.harmonic(normal_audio)
-        pitched_audio_harm = librosa.effects.harmonic(pitched_audio)
-        print('Calculating chroma features for audio...')
-        normal_std_chroma = librosa.feature.chroma_stft(normal_audio_harm, sr=sr, hop_length=hop_length)
-        normal_gta_chroma = util.pitch_to_chroma(gta.pitch(normal_audio_harm, sr=sr, hop_length=hop_length))
-        pitched_std_chroma = librosa.feature.chroma_stft(pitched_audio_harm, sr=sr, hop_length=hop_length)
-        pitched_gta_chroma = util.pitch_to_chroma(gta.pitch(pitched_audio_harm, sr=sr, hop_length=hop_length))
-
-        print('Calculating chroma features for score... ')
-        score_chroma = util.pitch_to_chroma(
-            extract_score_pitches(rec_id, frames=normal_std_chroma.shape[1]))
-        ground_truth_path = extract_ground_truth(rec_id, max_frame=normal_std_chroma.shape[1])
-
-        print('Calculating DTWs...')
-        print('(1/4)...')
-        distances_unpitched_std, path_unpitched_std = get_alignment(normal_std_chroma, score_chroma, 'euclidean')
-        # print('(2/4)...')
-        # distances_unpitched_gta, path_unpitched_gta = get_alignment(normal_gta_chroma, score_chroma, 'gta')
-        # print('(3/4)...')
-        # distances_pitched_std, path_pitched_std = get_alignment(pitched_std_chroma, score_chroma, 'euclidean')
-        # print('(4/4)...')
-        # distances_pitched_gta, path_pitched_gta = get_alignment(pitched_gta_chroma, score_chroma, 'gta')
-
-        print('Saving calculations to cache...')
-        cache = (
-            normal_std_chroma, normal_gta_chroma,
-            pitched_std_chroma, pitched_gta_chroma,
-            score_chroma,
-            ground_truth_path,
-            distances_unpitched_std, path_unpitched_std,
-            # distances_unpitched_gta, path_unpitched_gta,
-            # distances_pitched_std, path_pitched_std,
-            # distances_pitched_gta, path_pitched_gta
-        )
-        np.save(os.path.join(package_dir, 'cache', f'{rec_id}_{str(hop_length)}.npy'), cache)
-
-        return cache
-    else:
-        print('Cached values are getting loaded...')
-        return np.load(os.path.join(package_dir, 'cache', f'{rec_id}_{str(hop_length)}.npy'))
+def get_ids():
+    return sorted(dataset.keys())

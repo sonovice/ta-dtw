@@ -1,23 +1,39 @@
 from numba import jit
 import numpy as np
+import librosa
+from scipy.spatial.distance import cdist, cosine
+
+import librosa.display
+import matplotlib.pyplot as plt
 
 from . import util
 
 
 @jit
-def calc_accu_costs(n, m):
+def calc_accu_matrix(n, m, trans_penalty=7):
     # Create multidimensional circular matrix of input matrix
     n_circular = util.chroma_to_circular(n)
 
+    N = n.shape[1]
+    M = m.shape[1]
+
+    ####################################################################################################################
+    # Cost Matrix                                                                                                      #
+    ####################################################################################################################
+
     # Calculate distances using cosine similarity
-    c = 1 - np.matmul(n_circular.T, m)
+    # C = 1 - np.matmul(n_circular.T, m)
+    # print('Distances calculated')
 
     # Correct axes: (n, t, m) -> (n, m ,t)
-    c = np.swapaxes(c, 1, 2)
-    # print(c.shape)
+    # C = np.swapaxes(C, 1, 2)
 
-    N = c.shape[0]
-    M = c.shape[1]
+    C = np.empty((N, M, 12))
+    for t in range(12):
+        C[:, :, t] = 1 - np.matmul(n_circular[:, t, :].T, m)
+
+    # Initialize multidimensional accumulated cost matrix
+    D = np.ones(C.shape) * np.inf
 
     allowed_steps = np.array([
         [0, +1, 0],
@@ -32,16 +48,29 @@ def calc_accu_costs(n, m):
     ])
 
     # Specify additional costs for the individual steps
-    tm = 7  # Additional transposition cost multiplier
     weights_add = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-    weights_mul = np.array([2, 2, 1.3, 2 * tm, 2 * tm, 2 * tm, 2 * tm, 2 * tm, 2 * tm, 1.3 * tm, 1.3 * tm])
+    weights_mul = np.array([
+        2,
+        2,
+        1.3,
+        2 * trans_penalty,
+        2 * trans_penalty,
+        2 * trans_penalty,
+        2 * trans_penalty,
+        2 * trans_penalty,
+        2 * trans_penalty,
+        1.3 * trans_penalty,
+        1.3 * trans_penalty
+    ])
 
-    # Initialize multidimensional accumulated cost matrix...
-    D = np.ones(c.shape) * np.inf
-    D[:, 0, :] = np.cumsum(c[:, 0, :], axis=0)
-    D[0, :, :] = np.cumsum(c[0, :, :], axis=1)
+    ####################################################################################################################
+    # Accumulated Cost Matrix                                                                                          #
+    ####################################################################################################################
 
-    # ... and calculate it
+    D[:, 0, :] = np.cumsum(C[:, 0, :], axis=0)
+    D[0, :, :] = np.cumsum(C[0, :, :], axis=1)
+
+    # Calculate D
     for n in range(1, N):
         for m in range(1, M):
             for t in range(0, 12):
@@ -51,7 +80,7 @@ def calc_accu_costs(n, m):
                         m - allowed_steps[cur_step_idx, 1],
                         (t - allowed_steps[cur_step_idx, 2]) % 12
                     ]
-                    cur_c = c[n, m, t]
+                    cur_c = C[n, m, t]
                     cur_cost = cur_D + (cur_w_mul * cur_c + cur_w_add)
 
                     if cur_cost < D[n, m, t]:
@@ -62,6 +91,10 @@ def calc_accu_costs(n, m):
 
 @jit
 def backtracking(D):
+    ####################################################################################################################
+    # Backtracking                                                                                                     #
+    ####################################################################################################################
+
     N = D.shape[0]
     M = D.shape[1]
 
@@ -112,3 +145,15 @@ def backtracking(D):
         path.append((n, m, t))
 
     return path
+
+
+@jit
+def dtw(n, m):
+    D, wp = librosa.dtw(n, m)
+    return wp
+
+
+@jit
+def ta_dtw(n, m, trans_penalty=7):
+    D = calc_accu_matrix(n, m, trans_penalty=trans_penalty)
+    return backtracking(D)

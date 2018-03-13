@@ -1,0 +1,13 @@
+name: ta-dtw
+
+channels:
+  - conda-forge
+
+dependencies:
+  - numpy
+  - numba
+  - scipy
+  - matplotlib
+  - librosa
+  - pip:
+    - intervaltree
