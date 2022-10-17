@@ -1,3 +1,5 @@
+from typing import Tuple, List
+
 import librosa
 import numpy as np
 from numba import jit
@@ -5,7 +7,7 @@ from scipy.spatial.distance import cdist
 
 
 @jit
-def compute_cost_matrix(n, m, metric):
+def compute_cost_matrix(n: np.ndarray, m: np.ndarray, metric: str) -> np.ndarray:
     N = n.shape[1]
     M = m.shape[1]
 
@@ -20,7 +22,7 @@ def compute_cost_matrix(n, m, metric):
 
 
 @jit
-def compute_accumulated_cost_matrix(cost_matrix, transposition_penalty=1.0):
+def compute_accumulated_cost_matrix(cost_matrix: np.ndarray, transposition_penalty: float = 1.0) -> np.ndarray:
     # Initialize multidimensional accumulated cost matrix
     accumulated_cost_matrix = np.ones(cost_matrix.shape) * np.inf
 
@@ -38,21 +40,7 @@ def compute_accumulated_cost_matrix(cost_matrix, transposition_penalty=1.0):
         [+1, +1, -1]
     ])
 
-    # Specify additional costs for the individual steps
     weights_add = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-    # weights_mul = np.array([
-    #     2,
-    #     2,
-    #     1.3,
-    #     2 * transposition_penalty,
-    #     2 * transposition_penalty,
-    #     2 * transposition_penalty,
-    #     2 * transposition_penalty,
-    #     2 * transposition_penalty,
-    #     2 * transposition_penalty,
-    #     1.3 * transposition_penalty,
-    #     1.3 * transposition_penalty
-    # ])
     weights_mul = np.array([
         1,
         1,
@@ -89,11 +77,7 @@ def compute_accumulated_cost_matrix(cost_matrix, transposition_penalty=1.0):
 
 
 @jit
-def backtracking(accumulated_cost_matrix):
-    ####################################################################################################################
-    # Backtracking                                                                                                     #
-    ####################################################################################################################
-
+def backtracking(accumulated_cost_matrix: np.ndarray) -> List[Tuple[int, int, int]]:
     N, M, _ = accumulated_cost_matrix.shape
 
     allowed_steps = np.array([
@@ -130,7 +114,7 @@ def backtracking(accumulated_cost_matrix):
                 (t - 1) % 12,
                 (t + 1) % 12
             ))
-            n, m, t = n - 1, 0, possible_t[np.argmin(accumulated_cost_matrix[0, m - 1, possible_t])]
+            n, m, t = n - 1, 0, possible_t[np.argmin(accumulated_cost_matrix[n - 1, 0, possible_t])]
 
         else:
             possible_steps = np.array((

@@ -60,7 +60,7 @@ def batch(kwargs):
     has_drift, feature_type, alignment = kwargs['has_drift'], kwargs['feature_type'], kwargs['alignment']
 
     rec_ids = data.get_ids()
-    rec_ids = ['1728']
+    rec_ids = ['1727']
     max_length_seconds = 600
 
     result_dir = f"results/{feature_type}_{alignment}_{'drift' if has_drift else 'original'}"
@@ -150,46 +150,49 @@ def run_eval_metrics():
 
 
 def run_eval_transposition_penalty():
-    intervals = [0.25, 0.5]
+    intervals = [0.25, 0.5, 1.0]
     hop_length = 1024
-    rec_id = '1727'
+    rec_ids = ['1727', '1728']
 
-    for interval in tqdm(intervals, desc='Interval'):
-        tqdm.write(f"\nInterval: {interval}")
+    for rec_id in tqdm(rec_ids, desc="File"):
+        tqdm.write(f'=== {rec_id} =============================')
+        for interval in tqdm(intervals, desc='Interval'):
+            tqdm.write(f"  Interval: {interval}")
 
-        audio, sr = librosa.load(os.path.join('data', 'drift', f'{rec_id}.wav'))
-        audio_features = feature.audio_to_pcp(audio, hop_length=hop_length)
-        del audio
-        length = audio_features.shape[1]
+            audio, sr = librosa.load(os.path.join('data', 'drift', f'{rec_id}.wav'))
+            audio_features = feature.audio_to_pcp(audio, hop_length=hop_length)
+            del audio
+            length = audio_features.shape[1]
 
-        score_features = feature.pitch_to_chroma(data.extract_score_pitches(rec_id, length))
-        ground_truth = data.extract_ground_truth(rec_id, length)
+            score_features = feature.pitch_to_chroma(data.extract_score_pitches(rec_id, length))
+            ground_truth = data.extract_ground_truth(rec_id, length)
 
-        cost_matrix = compute_cost_matrix(score_features, audio_features, metric='cosine')
+            cost_matrix = compute_cost_matrix(score_features, audio_features, metric='cosine')
 
-        for tp in tqdm(np.arange(1, 15, step=0.5), desc="TP value"):
-            alignment_path = np.asarray(backtracking(compute_accumulated_cost_matrix(cost_matrix, transposition_penalty=tp)))
-            onsets_audio = np.interp(ground_truth[1], sorted(alignment_path[:, 0]), sorted(alignment_path[:, 1]))
-            diff = np.abs(onsets_audio[10:-10] - ground_truth[0][10:-10])
-            diff_s = diff * (hop_length / 22050)
-            count = np.count_nonzero(diff_s <= interval)
-            score = count / len(diff_s)
+            for tp in tqdm(np.arange(1, 15, step=1), desc="TP value"):
+                alignment_path = np.asarray(backtracking(compute_accumulated_cost_matrix(cost_matrix, transposition_penalty=tp)))
+                onsets_audio = np.interp(ground_truth[1], sorted(alignment_path[:, 0]), sorted(alignment_path[:, 1]))
+                diff = np.abs(onsets_audio[10:-10] - ground_truth[0][10:-10])
+                diff_s = diff * (hop_length / 22050)
+                count = np.count_nonzero(diff_s <= interval)
+                score = count / len(diff_s)
 
-            tqdm.write(f"{tp}: {score}")
+                tqdm.write(f"    {tp}: {score}")
 
 
 def run_experiments():
-    ctx = mp.get_context('spawn')
-    pool = ctx.Pool(6)
-
     experiments = [
-        # dict(has_drift=False, feature_type='chroma', alignment='dtw'),
         # dict(has_drift=True, feature_type='chroma', alignment='dtw'),
-        dict(has_drift=True, feature_type='pcp', alignment='ta-dtw'),
-        dict(has_drift=False, feature_type='pcp', alignment='ta-dtw'),
+        # dict(has_drift=False, feature_type='chroma', alignment='dtw'),
         # dict(has_drift=False, feature_type='pcp', alignment='dtw'),
+        dict(has_drift=True, feature_type='chroma', alignment='ta-dtw'),
+        dict(has_drift=True, feature_type='pcp', alignment='ta-dtw'),
+        # dict(has_drift=False, feature_type='pcp', alignment='ta-dtw'),
         # dict(has_drift=False, feature_type='none', alignment='none'),
     ]
+
+    ctx = mp.get_context('spawn')
+    pool = ctx.Pool(len(experiments))
 
     for _ in tqdm(pool.imap_unordered(batch, experiments)):
         pass

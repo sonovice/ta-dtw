@@ -4,7 +4,7 @@ import numpy as np
 
 
 @jit
-def pcp(y: np.ndarray, sr: int = 22050, hop_length: int = 512, fmin: float = None):
+def pcp(y: np.ndarray, sr: int = 22050, hop_length: int = 1024, fmin: float = None) -> np.ndarray:
     # Calculate pitches with 3 sub bands per semitone
     pitch = librosa.cqt(
         y, sr=sr,
