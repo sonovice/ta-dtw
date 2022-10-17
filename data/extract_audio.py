@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.io import wavfile
 
-dataset = np.load('musicnet.npz', mmap_mode='r', encoding='latin1')
+dataset = np.load('musicnet.npz', mmap_mode='r', encoding='latin1', allow_pickle=True)
 rec_ids = sorted(dataset.keys())
 
 
@@ -17,4 +17,4 @@ def extract_audio():
         print('{} ({}/{})'.format(rec_id, i + 1, len(rec_ids)))
 
 
-extract_audio()
+# extract_audio()

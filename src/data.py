@@ -1,11 +1,9 @@
 import math
-import os
 
 import numpy as np
 
-package_dir = os.path.dirname(os.path.abspath(__file__))
-dataset_path = os.path.join(package_dir, 'musicnet.npz')
-dataset = np.load(dataset_path, mmap_mode='r', encoding='latin1')
+dataset_path = './data/musicnet.npz'
+dataset = np.load(dataset_path, mmap_mode='r', encoding='latin1', allow_pickle=True)
 rec_ids = sorted(dataset.keys())
 
 dict_note_values = {
