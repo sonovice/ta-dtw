@@ -1,20 +1,12 @@
 import librosa
-from numba import jit
+import numba as nb
 import numpy as np
 
 
-@jit
-def pcp(y: np.ndarray, sr: int = 22050, hop_length: int = 1024, fmin: float = None) -> np.ndarray:
-    # Calculate pitches with 3 sub bands per semitone
-    pitch = librosa.cqt(
-        y, sr=sr,
-        bins_per_octave=12 * 3,
-        n_bins=12 * 8 * 3,
-        tuning=0, fmin=fmin, hop_length=hop_length
-    )
-
+@nb.jit
+def pcp(pitch) -> np.ndarray:
     # Reshape sub bands to own axes
-    pitch_splitted = librosa.magphase(pitch)[0].reshape(-1, 3, pitch.shape[1])
+    pitch_splitted = np.abs(pitch).reshape(-1, 3, pitch.shape[1])
 
     energy = pitch_splitted.sum(0)
     energy_argmax = np.argmax(energy, axis=0)
@@ -43,13 +35,16 @@ def pcp(y: np.ndarray, sr: int = 22050, hop_length: int = 1024, fmin: float = No
 
 
 def audio_to_pcp(y, hop_length):
-    features = pcp(y, hop_length=hop_length)
+    # Calculate pitches with 3 sub bands per semitone
+    features = librosa.cqt(y, sr=22050, bins_per_octave=12 * 3, tuning=0, n_bins=12 * 8 * 3, hop_length=hop_length, norm=None)
+    features = pcp(features)
     features = pitch_to_chroma(features)
+
     return features
 
 
 def audio_to_chroma(y, hop_length):
-    features = librosa.feature.chroma_cqt(y=y, sr=22050, tuning=0, hop_length=hop_length)
+    features = librosa.feature.chroma_stft(y, sr=22050, tuning=0, hop_length=hop_length, norm=None)
     features = pitch_to_chroma(features)
     return features
 

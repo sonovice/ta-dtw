@@ -50,20 +50,20 @@ def extract_ground_truth(rec_id, max_frame):
     return audio_onsets, score_onsets
 
 
-def extract_annotated_pitches(rec_id, sr=22050, hop_length=512):
-    audio, labels = dataset[rec_id]
-    hop_length = int(hop_length * (44100 / sr))
-    pitches = np.zeros((audio.shape[0] // hop_length, 12 * 11))
-
-    for frame in range(pitches.shape[0]):
-        labels_in_frame = labels[frame * hop_length]
-        for label in labels_in_frame:
-            (start, end, (instrument, note, measure, beat, note_value)) = label
-            pitches[frame, note] += 1
-
-    pitches = np.log(pitches.T + 1)[24:24 + 12 * 8, :]
-
-    return pitches
+# def extract_annotated_pitches(rec_id, sr=22050, hop_length=512):
+#     audio, labels = dataset[rec_id]
+#     hop_length = int(hop_length * (44100 / sr))
+#     pitches = np.zeros((audio.shape[0] // hop_length, 12 * 11))
+#
+#     for frame in range(pitches.shape[0]):
+#         labels_in_frame = labels[frame * hop_length]
+#         for label in labels_in_frame:
+#             (start, end, (instrument, note, measure, beat, note_value)) = label
+#             pitches[frame, note] += 1
+#
+#     pitches = np.log(pitches.T + 1)[24:24 + 12 * 8, :]
+#
+#     return pitches
 
 
 def extract_audio(rec_id):
@@ -99,6 +99,7 @@ def extract_score_pitches(rec_id, frames):
                     pass
 
     pitches = np.log(pitches + 1)[24:24 + 12 * 8, :]
+    # pitches = pitches[24:24 + 12 * 8, :]
 
     return pitches
 

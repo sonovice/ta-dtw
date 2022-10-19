@@ -1,44 +1,44 @@
 from typing import Tuple, List
 
 import librosa
+import numba as nb
 import numpy as np
-from numba import jit
 from scipy.spatial.distance import cdist
 
+allowed_steps = np.array([
+    # n,  m,  t
+    [+0, +1, +0],
+    [+1, +0, +0],
+    [+1, +1, +0],
 
-@jit
-def compute_cost_matrix(n: np.ndarray, m: np.ndarray, metric: str) -> np.ndarray:
+    [+0, +1, +1],
+    [+1, +0, +1],
+    [+1, +1, +1],
+
+    [+0, +1, -1],
+    [+1, +0, -1],
+    [+1, +1, -1]
+])
+
+
+@nb.jit
+def compute_cost_matrix(n: np.ndarray, m: np.ndarray) -> np.ndarray:
     N = n.shape[1]
     M = m.shape[1]
 
     cost_matrix = np.empty((N, M, 12))
     for t in range(12):
-        if metric == 'cosine':
-            cost_matrix[:, :, t] = 1 - (np.roll(n.T, shift=-t, axis=1) @ m)
-        else:
-            cost_matrix[:, :, t] = cdist(np.roll(n.T, shift=-t, axis=1), m.T, metric=metric)
+        cost_matrix[:, :, t] = 1 - (np.roll(n, shift=-t, axis=0).T @ m)  # cosine distance
 
     return cost_matrix
 
 
-@jit
-def compute_accumulated_cost_matrix(cost_matrix: np.ndarray, transposition_penalty: float = 1.0) -> np.ndarray:
+@nb.jit
+def compute_accumulated_cost_matrix(cost_matrix: np.ndarray, transposition_penalty: float = 6.5) -> np.ndarray:
     # Initialize multidimensional accumulated cost matrix
-    accumulated_cost_matrix = np.ones(cost_matrix.shape) * np.inf
+    accumulated_cost_matrix = np.ones_like(cost_matrix) * np.inf
 
-    N, M, _ = cost_matrix.shape
-
-    allowed_steps = np.array([
-        [+0, +1, +0],
-        [+1, +0, +0],
-        [+1, +1, +0],
-        [+0, +1, +1],
-        [+0, +1, -1],
-        [+1, +0, +1],
-        [+1, +0, -1],
-        [+1, +1, +1],
-        [+1, +1, -1]
-    ])
+    N, M, _ = accumulated_cost_matrix.shape
 
     weights_add = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     weights_mul = np.array([
@@ -70,51 +70,34 @@ def compute_accumulated_cost_matrix(cost_matrix: np.ndarray, transposition_penal
                     cur_cost_matrix_entry = cost_matrix[n, m, t]
                     cur_cost = cur_D + (cur_w_mul * cur_cost_matrix_entry + cur_w_add)
 
-                    if cur_cost < accumulated_cost_matrix[n, m, t]:
-                        accumulated_cost_matrix[n, m, t] = cur_cost
+                    accumulated_cost_matrix[n, m, t] = min(cur_cost, accumulated_cost_matrix[n, m, t])
 
     return accumulated_cost_matrix
 
 
-@jit
+@nb.jit
 def backtracking(accumulated_cost_matrix: np.ndarray) -> List[Tuple[int, int, int]]:
     N, M, _ = accumulated_cost_matrix.shape
-
-    allowed_steps = np.array([
-        [0, +1, 0],
-        [+1, 0, 0],
-        [+1, +1, 0],
-        [0, +1, +1],
-        [0, +1, -1],
-        [+1, 0, +1],
-        [+1, 0, -1],
-        [+1, +1, +1],
-        [+1, +1, -1]
-    ])
 
     # Start warping
     path = []
     n = N - 1
     m = M - 1
-    t = np.argmin(accumulated_cost_matrix[N - 1, M - 1, :])
-    path.append((n, m, t))
+    t = np.argmin(accumulated_cost_matrix[n, m, :])
+    path.append((n, m, t))  # starting point
 
     while n > 0 or m > 0:
         if n == 0:
-            possible_t = np.array((
-                t,
-                (t - 1) % 12,
-                (t + 1) % 12
-            ))
-            n, m, t = 0, m - 1, possible_t[np.argmin(accumulated_cost_matrix[0, m - 1, possible_t])]
+            m -= 1
+            possible_t = np.array((t, (t - 1) % 12, (t + 1) % 12))
+            idx_t = np.argmin(accumulated_cost_matrix[n, m, possible_t])
+            t = possible_t[idx_t]
 
         elif m == 0:
-            possible_t = np.array((
-                t,
-                (t - 1) % 12,
-                (t + 1) % 12
-            ))
-            n, m, t = n - 1, 0, possible_t[np.argmin(accumulated_cost_matrix[n - 1, 0, possible_t])]
+            n -= 1
+            possible_t = np.array((t, (t - 1) % 12, (t + 1) % 12))
+            idx_t = np.argmin(accumulated_cost_matrix[n, m, possible_t])
+            t = possible_t[idx_t]
 
         else:
             possible_steps = np.array((
@@ -131,14 +114,14 @@ def backtracking(accumulated_cost_matrix: np.ndarray) -> List[Tuple[int, int, in
 
 def dtw(n, m, metric):
     if metric == 'cosine':
-        cost_matrix = 1 - (n.T @ m)
+        cost_matrix = 1 - (n.T @ m)  # cosine distance
         _, wp = librosa.dtw(C=cost_matrix)
     else:
         _, wp = librosa.dtw(n, m, metric=metric)
     return wp
 
 
-def ta_dtw(n, m, metric, transposition_penalty=1.0):
-    cost_matrix = compute_cost_matrix(n, m, metric=metric)
+def ta_dtw(n, m, transposition_penalty=6.5):
+    cost_matrix = compute_cost_matrix(n, m)
     accumulated_cost_matrix = compute_accumulated_cost_matrix(cost_matrix, transposition_penalty=transposition_penalty)
     return backtracking(accumulated_cost_matrix)
