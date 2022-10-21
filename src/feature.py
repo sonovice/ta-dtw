@@ -44,7 +44,7 @@ def audio_to_pcp(y, hop_length):
 
 
 def audio_to_chroma(y, hop_length):
-    features = librosa.feature.chroma_stft(y, sr=22050, tuning=0, hop_length=hop_length, norm=None)
+    features = librosa.feature.chroma_cqt(y, sr=22050, tuning=0, hop_length=hop_length, norm=None)
     features = pitch_to_chroma(features)
     return features
 

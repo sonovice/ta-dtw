@@ -22,13 +22,18 @@ allowed_steps = np.array([
 
 
 @nb.jit
-def compute_cost_matrix(n: np.ndarray, m: np.ndarray) -> np.ndarray:
+def compute_cost_matrix(n: np.ndarray, m: np.ndarray, metric: str = 'euclidean') -> np.ndarray:
     N = n.shape[1]
     M = m.shape[1]
 
     cost_matrix = np.empty((N, M, 12))
-    for t in range(12):
-        cost_matrix[:, :, t] = 1 - (np.roll(n, shift=-t, axis=0).T @ m)  # cosine distance
+
+    if metric == 'cosine':
+        for t in range(12):
+            cost_matrix[:, :, t] = 1 - (np.roll(n, shift=-t, axis=0).T @ m)
+    else:
+        for t in range(12):
+            cost_matrix[:, :, t] = cdist(np.roll(n, shift=-t, axis=0).T, m.T, metric=metric)
 
     return cost_matrix
 
@@ -117,11 +122,12 @@ def dtw(n, m, metric):
         cost_matrix = 1 - (n.T @ m)  # cosine distance
         _, wp = librosa.dtw(C=cost_matrix)
     else:
-        _, wp = librosa.dtw(n, m, metric=metric)
+        cost_matrix = cdist(n.T, m.T, metric=metric)
+        _, wp = librosa.dtw(C=cost_matrix)
     return wp
 
 
-def ta_dtw(n, m, transposition_penalty=6.5):
-    cost_matrix = compute_cost_matrix(n, m)
+def ta_dtw(n, m, transposition_penalty, metric='euclidean'):
+    cost_matrix = compute_cost_matrix(n, m, metric=metric)
     accumulated_cost_matrix = compute_accumulated_cost_matrix(cost_matrix, transposition_penalty=transposition_penalty)
     return backtracking(accumulated_cost_matrix)

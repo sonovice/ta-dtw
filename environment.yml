@@ -4,10 +4,13 @@ channels:
   - conda-forge
 
 dependencies:
-  - numpy
-  - numba
-  - scipy
-  - matplotlib
-  - librosa
+  - numpy==1.19.5
+  - numba==0.37.0
+  - scipy==1.1.0
+  - matplotlib==3.1.1
+  - librosa==0.6.0
+  - seaborn
   - pip:
-    - intervaltree
+    - intervaltree==2.1.0
+    - tqdm==4.64.1
+    - pretty-midi==0.2.9
