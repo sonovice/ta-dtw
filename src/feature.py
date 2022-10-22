@@ -1,3 +1,5 @@
+import warnings
+
 import librosa
 import numba as nb
 import numpy as np
@@ -36,7 +38,9 @@ def pcp(pitch) -> np.ndarray:
 
 def audio_to_pcp(y, hop_length):
     # Calculate pitches with 3 sub bands per semitone
-    features = librosa.cqt(y, sr=22050, bins_per_octave=12 * 3, tuning=0, n_bins=12 * 8 * 3, hop_length=hop_length, norm=None)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=FutureWarning)
+        features = librosa.cqt(y, sr=22050, bins_per_octave=12 * 3, tuning=0, n_bins=12 * 8 * 3, hop_length=hop_length, norm=None)
     features = pcp(features)
     features = pitch_to_chroma(features)
 
@@ -44,7 +48,9 @@ def audio_to_pcp(y, hop_length):
 
 
 def audio_to_chroma(y, hop_length):
-    features = librosa.feature.chroma_cqt(y, sr=22050, tuning=0, hop_length=hop_length, norm=None)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=FutureWarning)
+        features = librosa.feature.chroma_cqt(y, sr=22050, tuning=0, hop_length=hop_length, norm=None)
     features = pitch_to_chroma(features)
     return features
 
