@@ -57,7 +57,7 @@ def configuration_worker(args):
 
 
 def run_configurations():
-    results_path = Path(f'../experiments/')
+    results_path = Path(f'../configurations/')
     results_path.mkdir(parents=True, exist_ok=True)
     rec_ids = list(dataset.features.keys())
 
