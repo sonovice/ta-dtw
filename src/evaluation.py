@@ -1,5 +1,4 @@
 import itertools
-import json
 import multiprocessing as mp
 from collections import defaultdict
 from pathlib import Path
@@ -107,8 +106,8 @@ def run_configurations():
         for results, args in tqdm(pool.imap_unordered(configuration_worker, configurations), total=len(configurations)):
             rec_id, has_drift, feature_type, is_transposition_aware, metric, transposition_penalty = args
             file_name = f"{rec_id}_drift={has_drift}_feature={feature_type}_algo={'ta-dtw' if is_transposition_aware else 'dtw'}_metric={metric}_tp={transposition_penalty}.json"
-            with open(results_path / file_name, 'w') as fp:
-                json.dump(results, fp)
+            with open(results_path / file_name, 'wb') as fp:
+                fp.write(orjson.dumps(results))
 
 
 def index_from_configurations() -> list:
