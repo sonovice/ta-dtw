@@ -250,7 +250,7 @@ def viz_final_results(tp, metric):
         axs[1 if has_drift else 0].plot(intervals, values, style, label=label)
 
         print()
-        print(label)
+        print(f"{'With' if has_drift else 'Without'} drift, {'TA-DTW' if is_transposition_aware else 'DTW'}, {feature_type}")
         for i, v in zip(intervals, values):
             print(f'{i:>6} - {v:.2f}%')
 
