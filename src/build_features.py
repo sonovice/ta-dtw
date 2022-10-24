@@ -102,4 +102,4 @@ if __name__ == '__main__':
         if features is not None:
             features_all.update(features)
 
-    np.save('../data/features.npy', dict(features_all))
+    np.save('../data/musicnet_features.npy', features_all.to_dict())

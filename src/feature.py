@@ -5,7 +5,7 @@ import numba as nb
 import numpy as np
 
 
-@nb.jit
+@nb.jit(forceobj=True)
 def pcp(pitch) -> np.ndarray:
     # Reshape sub bands to own axes
     pitch_splitted = np.abs(pitch).reshape(-1, 3, pitch.shape[1])
