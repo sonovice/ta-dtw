@@ -78,8 +78,7 @@ def run_configurations():
         ['pcp'],  # feature_type
         [True],  # is_transposition_aware
         ['euclidean'],  # metric
-        [1, 10, 20] + list(range(1, 11)) + [6.5, 6.6, 6.7, 6.8, 6.9, 7.0, 7.1, 7.2, 7.3, 7.4, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5]
-        # transposition_penalty
+        [1, 10, 20] + list(range(1, 11)) + [6.5, 6.6, 6.7, 6.8, 6.9, 7.0, 7.1, 7.2, 7.3, 7.4, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5]  # transposition_penalty
     ))
     configurations_all.extend(configurations_transposition_penalty)
 
