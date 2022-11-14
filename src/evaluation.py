@@ -14,9 +14,10 @@ from tqdm import tqdm
 
 import dataset
 import dtw
+from plot_helper import save_fig_decorator
 
-matplotlib.use('tkagg')
-sns.set_theme(style="darkgrid")
+# matplotlib.use('tkagg')
+# sns.set_theme(style="darkgrid")
 
 HOP_LENGTH = 1024
 SAMPLE_RATE = 22050
@@ -127,7 +128,8 @@ def index_from_configurations() -> list:
     return index
 
 
-def viz_metrics():
+@save_fig_decorator(ratio=1/2)
+def drift_metrics():
     index = index_from_configurations()
     index = filter(
         lambda e: all([
@@ -139,7 +141,8 @@ def viz_metrics():
         index
     )
 
-    metrics = ['cosine', 'euclidean', 'cityblock']
+    metrics = ['cityblock', 'euclidean', 'cosine']
+    # metrics = ['cosine', 'euclidean']
     results = Addict({
         metric: {
             'num_onsets': 0,
@@ -159,14 +162,15 @@ def viz_metrics():
         x = [f'≤{i}s' for i in INTERVALS]
         y = [(results[metric][interval] / results[metric].num_onsets) * 100 for interval in INTERVALS]
         ax.plot(x, y, f"--{['o', 's', 'D'][m]}", label=metric)
-        ax.set_title('Metrics')
-        ax.set_xlabel('Intervals')
-        ax.set_ylabel('Percentage of correctly aligned note events')
-        ax.set_ylim(86, 100)
-    plt.legend(loc='upper left')
+        # ax.set_title('Metrics')
+        ax.set_xlabel('Absolute misalignment error')
+        ax.set_ylabel('Percentage of note events')
+        ax.set_ylim(82, 100)
+    plt.legend(['manhatten', 'euclidean', 'cosine'], loc='lower right')
 
 
-def viz_transposition_penalty(metric):
+@save_fig_decorator(ratio=0.55)
+def drift_transposition_penalty(metric):
     index = index_from_configurations()
     index = filter(
         lambda e: all([
@@ -200,17 +204,19 @@ def viz_transposition_penalty(metric):
     y_drift = [(num_matches_per_tp_drift[tp] / num_onsets_per_tp_drift[tp]) * 100 for tp in x]
     y_original = [(num_matches_per_tp_original[tp] / num_onsets_per_tp_original[tp]) * 100 for tp in x]
     y_mixed = [(yd + yo) / 2 for yd, yo in zip(y_drift, y_original)]
-    ax.plot(x, y_drift, '--.', label='With drift')
-    ax.plot(x, y_original, '--.', label='Without drift')
-    ax.plot(x, y_mixed, ':.', label='Mixed')
-    ax.set_title('Transposition penalty factor influence')
+    ax.plot(x, y_original, '--o', label='Without drift')
+    ax.plot(x, y_mixed, '--D', label='Mixed')
+    ax.plot(x, y_drift, '--s', label='With drift')
+    # ax.set_title('Transposition penalty factor influence')
     ax.set_xlabel('Transposition penalty factor')
-    ax.set_ylabel('Score in percent')
-    ax.set_ylim(90, 100)
-    ax.legend()
+    ax.set_ylabel('Percentage of note events with\nabsolute misalignment error ≤0.3s')
+    ax.set_ylim(96.3, 96.7)
+    ax.set_xlim(6.75, 9.25)
+    ax.legend(loc='lower left')
 
 
-def viz_final_results(tp, metric):
+@save_fig_decorator(ratio=0.85)
+def drift_final_results(tp, metric):
     index = index_from_configurations()
     index = filter(
         lambda e: all([
@@ -230,7 +236,7 @@ def viz_final_results(tp, metric):
                 results[str(entry.has_drift)][str(entry.is_transposition_aware)][entry.feature_type][interval][0] += data.num_onsets
                 results[str(entry.has_drift)][str(entry.is_transposition_aware)][entry.feature_type][interval][1] += data.matches_in_interval[str(interval)]
 
-    fig, axs = plt.subplots(1, 2, constrained_layout=True, sharex=True, sharey=True)
+    fig, axs = plt.subplots(3, 1, constrained_layout=True, sharex=True)
     combinations = list(itertools.product(
         ['False', 'True'],  # has drift
         ['False', 'True'],  # is transposition aware
@@ -245,8 +251,12 @@ def viz_final_results(tp, metric):
         values = [(matched / num) * 100 for num, matched in list(entry.values())]
 
         label = f"{'TA-DTW' if is_transposition_aware else 'DTW'}, {feature_type}"
-        style = f"{'--' if is_transposition_aware else ':'}{'s' if feature_type == 'chroma' else 'o'}"
-        axs[1 if has_drift else 0].plot(intervals, values, style, label=label)
+        style = f"{'-' if is_transposition_aware else '--'}{'s' if feature_type == 'chroma' else 'o'}"
+        if not has_drift:
+            axs[0].plot(intervals, values, style, label=label)
+        else:
+            axs[1].plot(intervals, values, style, label=label)
+            axs[2].plot(intervals, values, style, label=label)
 
         print()
         print(f"{'With' if has_drift else 'Without'} drift, {'TA-DTW' if is_transposition_aware else 'DTW'}, {feature_type}")
@@ -254,23 +264,37 @@ def viz_final_results(tp, metric):
             print(f'{i:>6} - {v:.2f}%')
 
     axs[0].set_title('Without drift')
-    axs[0].set_ylim(-10, 110)
+    axs[0].set_ylim(86, 100)
     axs[0].legend(loc='lower right')
 
+    axs[1].spines['bottom'].set_visible(False)
+    axs[2].spines['top'].set_visible(False)
     axs[1].set_title('With drift')
-    axs[1].set_ylim(-10, 110)
-    axs[1].legend(loc='lower right')
+    axs[1].set_ylim(86, 100)
+    axs[2].set_ylim(0, 45)
 
-    fig.suptitle(f"Transposition penalty = {tp}, metric = {metric}")
+    d = .015  # how big to make the diagonal lines in axes coordinates
+    # arguments to pass to plot, just so we don't keep repeating them
+    kwargs = dict(transform=axs[1].transAxes, color='lightgray', clip_on=False)
+    axs[1].plot((-d, +d), (-d, +d), **kwargs)  # top-left diagonal
+    axs[1].plot((1 - d, 1 + d), (-d, +d), **kwargs)  # top-right diagonal
+
+    kwargs.update(transform=axs[2].transAxes)  # switch to the bottom axes
+    axs[2].plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
+    axs[2].plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
+
+    # axs[1].legend(loc='lower right')
+
+    # fig.suptitle(f"Transposition penalty={tp}, metric={metric}")
 
 
 if __name__ == '__main__':
     run_configurations()
 
-    viz_metrics()
-    viz_transposition_penalty('euclidean')
+    drift_metrics()
+    drift_transposition_penalty('euclidean')
     # viz_final_results(6.7, metric='euclidean')  # best with drift
-    viz_final_results(8.0, metric='euclidean')  # best mixed
+    drift_final_results(8.0, metric='euclidean')  # best mixed
     # viz_final_results(8.1, metric='euclidean')  # best without drift
 
     plt.show()
