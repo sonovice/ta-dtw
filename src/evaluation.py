@@ -128,7 +128,7 @@ def index_from_configurations() -> list:
     return index
 
 
-@save_fig_decorator(ratio=1/2)
+@save_fig_decorator(ratio=0.4)
 def drift_metrics():
     index = index_from_configurations()
     index = filter(
@@ -161,12 +161,12 @@ def drift_metrics():
     for m, metric in enumerate(metrics):
         x = [f'≤{i}s' for i in INTERVALS]
         y = [(results[metric][interval] / results[metric].num_onsets) * 100 for interval in INTERVALS]
-        ax.plot(x, y, f"--{['o', 's', 'D'][m]}", label=metric)
+        ax.plot(x, y, f"-{['o', 's', 'D'][m]}", markersize=4, label=metric)
         # ax.set_title('Metrics')
         ax.set_xlabel('Absolute misalignment error')
         ax.set_ylabel('Percentage of note events')
         ax.set_ylim(82, 100)
-    plt.legend(['manhatten', 'euclidean', 'cosine'], loc='lower right')
+    plt.legend(['Manhatten', 'Euclidean', 'Cosine'], loc='lower right')
 
 
 @save_fig_decorator(ratio=0.55)
@@ -204,18 +204,18 @@ def drift_transposition_penalty(metric):
     y_drift = [(num_matches_per_tp_drift[tp] / num_onsets_per_tp_drift[tp]) * 100 for tp in x]
     y_original = [(num_matches_per_tp_original[tp] / num_onsets_per_tp_original[tp]) * 100 for tp in x]
     y_mixed = [(yd + yo) / 2 for yd, yo in zip(y_drift, y_original)]
-    ax.plot(x, y_original, '--o', label='Without drift')
-    ax.plot(x, y_mixed, '--D', label='Mixed')
-    ax.plot(x, y_drift, '--s', label='With drift')
+    ax.plot(x, y_original, '-o', markersize=3, label='Without drift')
+    ax.plot(x, y_mixed, '-D', markersize=3, label='Mixed')
+    ax.plot(x, y_drift, '-s', markersize=3, label='With drift')
     # ax.set_title('Transposition penalty factor influence')
     ax.set_xlabel('Transposition penalty factor')
     ax.set_ylabel('Percentage of note events with\nabsolute misalignment error ≤0.3s')
-    ax.set_ylim(96.3, 96.7)
-    ax.set_xlim(6.75, 9.25)
-    ax.legend(loc='lower left')
+    ax.set_ylim(95.75, 96.7)
+    ax.set_xlim(1.75, 9.25)
+    ax.legend(loc='lower right')
 
 
-@save_fig_decorator(ratio=0.85)
+@save_fig_decorator(ratio=0.95)
 def drift_final_results(tp, metric):
     index = index_from_configurations()
     index = filter(
@@ -236,7 +236,7 @@ def drift_final_results(tp, metric):
                 results[str(entry.has_drift)][str(entry.is_transposition_aware)][entry.feature_type][interval][0] += data.num_onsets
                 results[str(entry.has_drift)][str(entry.is_transposition_aware)][entry.feature_type][interval][1] += data.matches_in_interval[str(interval)]
 
-    fig, axs = plt.subplots(3, 1, constrained_layout=True, sharex=True)
+    fig, axs = plt.subplots(3, 1, constrained_layout=True)
     combinations = list(itertools.product(
         ['False', 'True'],  # has drift
         ['False', 'True'],  # is transposition aware
@@ -250,13 +250,13 @@ def drift_final_results(tp, metric):
         intervals = [f'≤{i}s' for i in entry.keys()]
         values = [(matched / num) * 100 for num, matched in list(entry.values())]
 
-        label = f"{'TA-DTW' if is_transposition_aware else 'DTW'}, {feature_type}"
+        label = f"{'TA-DTW' if is_transposition_aware else 'DTW'}, {'Chroma' if feature_type == 'chroma' else 'PCP'}"
         style = f"{'-' if is_transposition_aware else '--'}{'s' if feature_type == 'chroma' else 'o'}"
         if not has_drift:
-            axs[0].plot(intervals, values, style, label=label)
+            axs[0].plot(intervals, values, style, markersize=4, label=label)
         else:
-            axs[1].plot(intervals, values, style, label=label)
-            axs[2].plot(intervals, values, style, label=label)
+            axs[1].plot(intervals, values, style, markersize=4, label=label)
+            axs[2].plot(intervals, values, style, markersize=4, label=label)
 
         print()
         print(f"{'With' if has_drift else 'Without'} drift, {'TA-DTW' if is_transposition_aware else 'DTW'}, {feature_type}")
@@ -265,14 +265,19 @@ def drift_final_results(tp, metric):
 
     axs[0].set_title('Without drift')
     axs[0].set_ylim(86, 100)
-    axs[0].legend(loc='lower right')
+
 
     axs[1].spines['bottom'].set_visible(False)
-    axs[2].spines['top'].set_visible(False)
-    axs[1].set_title('With drift')
+    axs[1].set_xticklabels([])
+    axs[1].set_title(' \nWith drift')
     axs[1].set_ylim(86, 100)
-    axs[2].set_ylim(0, 45)
+    axs[1].legend(loc='lower right')
 
+    axs[2].spines['top'].set_visible(False)
+    axs[2].set_ylim(0, 46)
+    axs[2].set_xlabel('Absolute misalignment error')
+
+    # "break signs"
     d = .015  # how big to make the diagonal lines in axes coordinates
     # arguments to pass to plot, just so we don't keep repeating them
     kwargs = dict(transform=axs[1].transAxes, color='lightgray', clip_on=False)
@@ -282,6 +287,8 @@ def drift_final_results(tp, metric):
     kwargs.update(transform=axs[2].transAxes)  # switch to the bottom axes
     axs[2].plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
     axs[2].plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
+
+    fig.supylabel('Percentage of note events')
 
     # axs[1].legend(loc='lower right')
 

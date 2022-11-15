@@ -35,6 +35,7 @@ def save_fig_decorator(**kwargs):
                 'axes.titlesize': font_size,
                 'legend.title_fontsize': font_size,
                 'legend.fontsize': font_size,
+                'figure.titlesize': font_size,
 
                 'figure.constrained_layout.use': True,
                 'figure.figsize': (
